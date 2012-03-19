@@ -1,6 +1,16 @@
 /*
  * MapView.java
+ * 
+ * Original sample code provided by Josh Marinacci - http://today.java.net/pub/a/today/2007/10/30/building-maps-into-swing-app-with-jxmapviewer.html
+ * 
+ * JAC444A - Assignment 2
+ * Additions made by:
+ * Michael Afidchao
+ * 062-699-103
+ * 
  */
+
+
 
 package mapapp;
 
@@ -17,10 +27,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import javax.swing.Timer;
-import javax.swing.Icon;
-import javax.swing.JDialog;
-import javax.swing.JFrame;
+//import javax.swing.Timer;
+//import javax.swing.Icon;
+//import javax.swing.JDialog;
+//import javax.swing.JFrame;
+import javax.swing.*;
 import org.jdesktop.swingx.JXMapViewer;
 import org.jdesktop.swingx.mapviewer.GeoPosition;
 import org.jdesktop.swingx.mapviewer.Waypoint;
@@ -33,6 +44,20 @@ import org.jdesktop.swingx.mapviewer.wms.WMSTileFactory;
  * The application's main frame.
  */
 public class MapView extends FrameView {
+    // Variables added by Michael Afidchao
+    private JToolBar jtbToolbar;
+    private JPanel byNamePanel;
+    private JPanel byCoordPanel;    
+    private JPanel containerPanel;
+    
+    private JLabel jlbCountry;
+    private JLabel jlbCity;
+    private JLabel jlbAddress;
+    private JLabel jlbByName;
+    private JComboBox jcbCountry;
+    private JComboBox jcbCity;
+    private JTextField jtfAddress;
+    private JButton jbtByName;	
 
     public MapView(SingleFrameApplication app) {
         super(app);
@@ -144,15 +169,46 @@ public class MapView extends FrameView {
 
         jButton2.setAction(actionMap.get("addWaypoint")); // NOI18N
         jButton2.setName("jButton2"); // NOI18N
+        
+        //*** code inserted by Michael Afidchao ***
+        jtbToolbar = new JToolBar("Show/Hide Panel");
+        initToolBar (jtbToolbar);  //initialize tool bar properties with method
+        containerPanel = new JPanel();
+        byNamePanel = new JPanel();
+        byCoordPanel = new JPanel();
+        
+        jlbCountry = new JLabel("Country");
+        jlbCity = new JLabel("City");
+        jlbAddress = new JLabel("Address");
+        jcbCountry = new JComboBox();
+        jcbCity = new JComboBox();
+        jtfAddress = new JTextField();
+        
+        byNamePanel.setLayout(new BoxLayout(byNamePanel, BoxLayout.PAGE_AXIS));
+        
+        byNamePanel.add(jlbCountry);
+        byNamePanel.add(jlbCity);
+        byNamePanel.add(jlbAddress);
+        byNamePanel.add(jcbCountry);
+        byNamePanel.add(jcbCity);
+        byNamePanel.add(jtfAddress);
+        
+        
+        containerPanel.add(byNamePanel);
+        containerPanel.add(byCoordPanel);
+        // *** end code insertion ***       
+        
 
         org.jdesktop.layout.GroupLayout mainPanelLayout = new org.jdesktop.layout.GroupLayout(mainPanel);
         mainPanel.setLayout(mainPanelLayout);
         mainPanelLayout.setHorizontalGroup(
-            mainPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(mainPanelLayout.createSequentialGroup()
-                .add(jButton1)
+            mainPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
+            .add(jtbToolbar)
+            .add(mainPanelLayout.createSequentialGroup()            	
+                //.add(jButton1)               
+                .add(containerPanel)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jButton2)
+                //.add(jButton2)                
                 .add(183, 183, 183))
             .add(jXMapKit1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 424, Short.MAX_VALUE)
         );
@@ -161,10 +217,12 @@ public class MapView extends FrameView {
             .add(org.jdesktop.layout.GroupLayout.TRAILING, mainPanelLayout.createSequentialGroup()
                 .add(jXMapKit1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 234, Short.MAX_VALUE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(mainPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jButton1)
-                    .add(jButton2)))
-        );
+                .add(jtbToolbar)
+                .add(mainPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)                	
+                    //.add(jButton1)              
+                    .add(containerPanel)))
+                    //.add(jButton2)))
+        );        
 
         menuBar.setName("menuBar"); // NOI18N
 
@@ -221,11 +279,29 @@ public class MapView extends FrameView {
                     .add(progressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(3, 3, 3))
         );
-
+               
         setComponent(mainPanel);
         setMenuBar(menuBar);
         setStatusBar(statusPanel);
     }// </editor-fold>//GEN-END:initComponents
+    
+    //inserted by Michael Afidchao
+    //add buttons to the JToolBar that shows/hides the panel
+    protected void initToolBar(JToolBar toolbar)
+    {
+    	class ToolBarHandler implements ActionListener
+    	{
+    		public void actionPerformed (ActionEvent e)
+    		{
+    			containerPanel.setVisible(!containerPanel.isVisible());
+    		}
+    	}
+    	
+    	JButton button = new JButton("Show/Hide Controls");
+    	button.addActionListener(new ToolBarHandler());
+    	toolbar.add(button);
+    	toolbar.setFloatable(false);    	
+    }
 
     @org.jdesktop.application.Action
     public void goChicago() {
@@ -264,7 +340,7 @@ public class MapView extends FrameView {
     private javax.swing.JProgressBar progressBar;
     private javax.swing.JLabel statusAnimationLabel;
     private javax.swing.JLabel statusMessageLabel;
-    private javax.swing.JPanel statusPanel;
+    private javax.swing.JPanel statusPanel;            
     // End of variables declaration//GEN-END:variables
 
     private final Timer messageTimer;
