@@ -14,8 +14,14 @@
 
 package mapapp;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+
 import org.jdesktop.application.Action;
 import org.jdesktop.application.ResourceMap;
 import org.jdesktop.application.SingleFrameApplication;
@@ -23,15 +29,39 @@ import org.jdesktop.application.FrameView;
 import org.jdesktop.application.TaskMonitor;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowFocusListener;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.net.URL;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Scanner;
 import java.util.Set;
 //import javax.swing.Timer;
 //import javax.swing.Icon;
 //import javax.swing.JDialog;
 //import javax.swing.JFrame;
 import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import javax.swing.text.NumberFormatter;
+
 import org.jdesktop.swingx.JXMapViewer;
 import org.jdesktop.swingx.mapviewer.GeoPosition;
 import org.jdesktop.swingx.mapviewer.Waypoint;
@@ -47,17 +77,36 @@ public class MapView extends FrameView {
     // Variables added by Michael Afidchao
     private JToolBar jtbToolbar;
     private JPanel byNamePanel;
-    private JPanel byCoordPanel;    
+    private JPanel byCoordPanel;
+    private JPanel waypointPanel;
     private JPanel containerPanel;
-    
+        
     private JLabel jlbCountry;
     private JLabel jlbCity;
     private JLabel jlbAddress;
     private JLabel jlbByName;
-    private JComboBox jcbCountry;
-    private JComboBox jcbCity;
+    private JComboBox<String> jcbCountry;
+    private JComboBox<String> jcbCity;
     private JTextField jtfAddress;
-    private JButton jbtByName;	
+    private JButton jbtByName; //, jbtByCountry, jbtByCity, jbtByAddress;
+    
+    private JLabel jlbLatitude, jlbLongitude, jlbByCoord;
+    //private JTextField jtfLatitude, jtfLongitude;
+    private JFormattedTextField jtfLatitude, jtfLongitude;
+    private JButton jbtByCoord;
+    
+    //private JButton jbtPrevWp, jbtNextWp;
+    private JLabel jlbPrevNextWp, jlbWaypoint, jlbWpLat, jlbWpLong;
+    private JSpinner jspPrevNextWp;
+    private JButton jbtDeleteWp, jbtAddWp, jbtGoToWp;
+    private JButton jbtSave;
+    private JButton jbtLoad;
+    
+    private SpinnerNumberModel waypointModel;    
+    //private Set<Waypoint> waypointList = new HashSet<Waypoint>();
+    private List<Waypoint> waypointList;
+    private List<Waypoint> countryList;
+    private List<Waypoint> cityList;
 
     public MapView(SingleFrameApplication app) {
         super(app);
@@ -161,7 +210,7 @@ public class MapView extends FrameView {
 
         jXMapKit1.setDefaultProvider(org.jdesktop.swingx.JXMapKit.DefaultProviders.OpenStreetMaps);
         jXMapKit1.setDataProviderCreditShown(true);
-        jXMapKit1.setName("jXMapKit1"); // NOI18N
+        jXMapKit1.setName("jXMapKit1"); // NOI18N        
 
         javax.swing.ActionMap actionMap = org.jdesktop.application.Application.getInstance(mapapp.MapApp.class).getContext().getActionMap(MapView.class, this);
         jButton1.setAction(actionMap.get("goChicago")); // NOI18N
@@ -176,29 +225,302 @@ public class MapView extends FrameView {
         containerPanel = new JPanel();
         byNamePanel = new JPanel();
         byCoordPanel = new JPanel();
-        
+        waypointPanel = new JPanel();
+                
         jlbCountry = new JLabel("Country");
         jlbCity = new JLabel("City");
         jlbAddress = new JLabel("Address");
-        jcbCountry = new JComboBox();
-        jcbCity = new JComboBox();
+        jlbByName = new JLabel("Search by Name");
+        jbtByName = new JButton ("Search Address");
+        //jbtByCountry = new JButton ("Country");
+        //jbtByCity = new JButton ("City");
+        //jbtByAddress = new JButton ("Address");
+        jcbCountry = new JComboBox<String>();
+        jcbCity = new JComboBox<String>();
         jtfAddress = new JTextField();
         
-        byNamePanel.setLayout(new BoxLayout(byNamePanel, BoxLayout.PAGE_AXIS));
+        jlbByCoord = new JLabel("Search by Coordinates");
+        jlbLongitude = new JLabel("Longitude");
+        jlbLatitude = new JLabel("Latitude");
         
-        byNamePanel.add(jlbCountry);
-        byNamePanel.add(jlbCity);
-        byNamePanel.add(jlbAddress);
-        byNamePanel.add(jcbCountry);
-        byNamePanel.add(jcbCity);
-        byNamePanel.add(jtfAddress);
+        //jtfLongitude = new JTextField(20);
+        //jtfLatitude = new JTextField(20);
+        jtfLongitude = new JFormattedTextField(new NumberFormatter(new DecimalFormat("0.000000")));
+        jtfLatitude = new JFormattedTextField(new NumberFormatter(new DecimalFormat("0.000000")));
+        jtfLatitude.setColumns(20);
+        jtfLongitude.setColumns(20);
+        
+        jbtByCoord = new JButton("Search");
+        
+        jlbWaypoint = new JLabel ("Waypoints Management");
+        jlbPrevNextWp = new JLabel("Waypoint");
+        jlbWpLat = new JLabel ("Latitude: n/a");
+        jlbWpLong = new JLabel ("Longitude: n/a");
+        
+        waypointList = new ArrayList<Waypoint>();
+        countryList = new ArrayList<Waypoint>();
+        cityList = new ArrayList<Waypoint>();
+        //waypointList.add(new Waypoint(0, 0));
+        //waypointModel = new SpinnerListModel(waypointList);
+        waypointModel = new SpinnerNumberModel(0,0,0,1);
+        jspPrevNextWp = new JSpinner(waypointModel);        
+        jbtGoToWp = new JButton("Go to Waypoint");
+        jbtAddWp = new JButton("Add Waypoint");
+        jbtDeleteWp = new JButton("Delete Waypoint");
+        jbtSave = new JButton("Save Waypoints File");
+        jbtLoad = new JButton("Load Waypoints File");
+        
+        //jspPrevNextWp.setSize(100, jspPrevNextWp.getSize().height);
+        jspPrevNextWp.setPreferredSize(new Dimension(50, 20));
+        
+        //byNamePanel.setLayout(new BoxLayout(byNamePanel, BoxLayout.Y_AXIS));        
+        byNamePanel.setLayout(new BorderLayout());
+        //byCoordPanel.setLayout(new BoxLayout(byCoordPanel, BoxLayout.Y_AXIS));
+        byCoordPanel.setLayout(new BorderLayout());
+        //waypointPanel.setLayout(new BoxLayout(waypointPanel, BoxLayout.Y_AXIS));
+        waypointPanel.setLayout(new BorderLayout());
+        containerPanel.setLayout(new GridLayout(1, 3));
+        
+        byNamePanel.setBorder(BorderFactory.createLineBorder(Color.black));
+        byCoordPanel.setBorder(BorderFactory.createLineBorder(Color.black));
+        waypointPanel.setBorder(BorderFactory.createLineBorder(Color.black));
+        containerPanel.setBorder(BorderFactory.createLineBorder(Color.black));
+        
+        containerPanel.setMaximumSize(new Dimension(Short.MAX_VALUE, 100));
+        
+        //set up the "By Name" panel (Country, City, Address)
+        JPanel tmpjp1 = new JPanel();
+        JPanel tmpjp2 = new JPanel();
+        JPanel tmpjp3 = new JPanel();        
+        JPanel tmpjp4 = new JPanel();
+        JPanel tmpjp5 = new JPanel();        
+        JPanel tmpCenter = new JPanel();
+
+        
+        /*tmpjp1.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp2.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp2a.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp2b.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp3.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp3a.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp3b.setBorder(BorderFactory.createLineBorder(Color.black));        
+        tmpjp4.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp4a.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp4b.setBorder(BorderFactory.createLineBorder(Color.black));        
+        tmpjp5.setBorder(BorderFactory.createLineBorder(Color.black));*/
+        
+        //tmpjp2.setLayout(new GridBagLayout());
+        tmpjp2.setLayout(new GridLayout(0,2));
+        tmpjp3.setLayout(new GridLayout(0,2));
+        tmpjp4.setLayout(new GridLayout(0,2));
+        //tmpjp2.setLayout(new BoxLayout(tmpjp2, BoxLayout.X_AXIS));        
+        //tmpjp3.setLayout(new BoxLayout(tmpjp3, BoxLayout.X_AXIS));
+        //tmpjp4.setLayout(new BoxLayout(tmpjp4, BoxLayout.X_AXIS));
+        tmpCenter.setLayout(new BoxLayout(tmpCenter, BoxLayout.Y_AXIS));
+
+        
+        /*tmpjp2a.setMaximumSize(new Dimension(100, 40));
+        tmpjp3a.setMaximumSize(new Dimension(100, 40));
+        tmpjp4a.setMaximumSize(new Dimension(100, 40));*/
+        //tmpjp2a.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        //tmpjp2a.setAlignmentY(10);
+        //jlbCountry.setAlignmentX(Component.LEFT_ALIGNMENT);
+        //jcbCountry.setPreferredSize(new Dimension(10, 20));
+        //jcbCountry.setMaximumSize(new Dimension(100, 20));
+        //jlbCountry.setPreferredSize(new Dimension(100, jlbCountry.getSize().height));
+        jlbCountry.setHorizontalAlignment(SwingConstants.LEFT);
+        jlbCity.setHorizontalAlignment(SwingConstants.LEFT);
+        jlbAddress.setHorizontalAlignment(SwingConstants.LEFT);
+        //jcbCountry.setMaximumSize(new Dimension(4, 5));
+        tmpjp2.setMaximumSize(new Dimension(200, 20));
+        tmpjp3.setMaximumSize(new Dimension(200, 20));
+        tmpjp4.setMaximumSize(new Dimension(200, 20));
+        //tmpjp3.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
+        //tmpjp4.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
+        //tmpCenter.setMaximumSize(new Dimension(50, 200));
+        
+        //jcbCountry.setAlignmentX(10);
         
         
+        //jlbCity.setPreferredSize(new Dimension(100, 10));
+        //jlbCity.setHorizontalAlignment(SwingConstants.RIGHT);
+        //jlbAddress.setPreferredSize(new Dimension(100, jlbAddress.getSize().height));
+        //jlbAddress.setHorizontalAlignment(SwingConstants.RIGHT);
+        
+        //jcbCity.setMaximumSize(new Dimension(100, 20));
+        //jcbCountry.setMaximumSize(new Dimension(100, 20));
+        //jtfAddress.setMaximumSize(new Dimension(100, 20));
+        
+        tmpjp1.add(jlbByName);
+        
+        tmpjp2.add(jlbCountry);
+        //tmpjp2.add(new JLabel(" "));
+        tmpjp2.add(jcbCountry);
+        //tmpjp2.add(new JLabel(" "));
+        
+        
+        tmpjp3.add(jlbCity);
+        //tmpjp3.add(new JLabel(" "));
+        tmpjp3.add(jcbCity);
+        //tmpjp3.add(new JLabel(" "));
+        
+        tmpjp4.add(jlbAddress);
+        //tmpjp4.add(new JLabel(" "));
+        tmpjp4.add(jtfAddress);
+        //tmpjp4.add(new JLabel(" "));
+        
+        tmpjp5.add(jbtByName);
+        
+        tmpCenter.add(tmpjp2);
+        tmpCenter.add(new JPanel());
+        tmpCenter.add(tmpjp3);
+        tmpCenter.add(new JPanel());
+        tmpCenter.add(tmpjp4);
+        
+        byNamePanel.add(tmpjp1, BorderLayout.PAGE_START);        
+        byNamePanel.add(tmpCenter, BorderLayout.CENTER);
+        byNamePanel.add(tmpjp5, BorderLayout.PAGE_END);
+         
+        //set up the Latitude/Longitude panel
+        tmpjp1 = new JPanel();
+        tmpjp2 = new JPanel();
+        tmpjp3 = new JPanel();
+        tmpjp4 = new JPanel();
+        tmpjp5 = new JPanel();
+        tmpCenter = new JPanel();
+        tmpCenter.setLayout(new BoxLayout(tmpCenter, BoxLayout.Y_AXIS));
+
+        /*tmpjp1.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp2.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp3.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp4.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp5.setBorder(BorderFactory.createLineBorder(Color.black));*/
+        
+        tmpjp1.add(jlbByCoord);
+        tmpjp2.add(jlbLatitude);
+        tmpjp2.add(jtfLatitude);
+        tmpjp3.add(jlbLongitude);
+        tmpjp3.add(jtfLongitude);        
+        tmpjp4.add(jbtByCoord);
+        
+        tmpCenter.add(tmpjp2);
+        tmpCenter.add(tmpjp3);
+        
+        byCoordPanel.add(tmpjp1, BorderLayout.PAGE_START);
+        //byCoordPanel.add(tmpjp2);
+        //byCoordPanel.add(tmpjp3);
+        byCoordPanel.add(tmpCenter, BorderLayout.CENTER);
+        byCoordPanel.add(tmpjp4, BorderLayout.PAGE_END);
+        
+        
+        //set up the Waypoint panel
+        tmpjp1 = new JPanel();
+        tmpjp2 = new JPanel();
+        tmpjp3 = new JPanel();
+        tmpjp4 = new JPanel();
+        tmpjp5 = new JPanel();
+        tmpCenter = new JPanel();
+        tmpCenter.setLayout(new BoxLayout(tmpCenter, BoxLayout.Y_AXIS));        
+        
+        /*tmpjp1.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp2.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp3.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp4.setBorder(BorderFactory.createLineBorder(Color.black));
+        tmpjp5.setBorder(BorderFactory.createLineBorder(Color.black));*/
+        
+        tmpjp1.add(jlbWaypoint);
+        tmpjp2.add(jlbPrevNextWp);
+        tmpjp2.add(jspPrevNextWp);
+        tmpjp2.add(jbtGoToWp);
+        tmpjp3.add(jlbWpLat);
+        tmpjp3.add(jlbWpLong);
+        tmpjp4.add(jbtAddWp);
+        tmpjp4.add(jbtDeleteWp);
+        tmpjp5.add(jbtLoad);
+        tmpjp5.add(jbtSave);
+        
+        tmpCenter.add(tmpjp2);
+        tmpCenter.add(tmpjp3);
+        tmpCenter.add(tmpjp4);
+        
+        waypointPanel.add(tmpjp1, BorderLayout.PAGE_START);
+        //waypointPanel.add(tmpjp2);
+        //waypointPanel.add(tmpjp3);
+        waypointPanel.add(tmpCenter, BorderLayout.CENTER);
+        waypointPanel.add(tmpjp5, BorderLayout.PAGE_END);
+        
+        
+        //add all panels to the main container panel
         containerPanel.add(byNamePanel);
         containerPanel.add(byCoordPanel);
-        // *** end code insertion ***       
+        containerPanel.add(waypointPanel);
         
+        //add the event handlers
+        LatLongBtnHandler latlongbtnListener = new LatLongBtnHandler();
+        jbtByCoord.addActionListener(latlongbtnListener);
+        AddWaypointHandler addwpbtnListener = new AddWaypointHandler();
+        jbtAddWp.addActionListener(addwpbtnListener);
+        GoToWaypointHandler gotowpbtnListener = new GoToWaypointHandler();
+        jbtGoToWp.addActionListener(gotowpbtnListener);
+        WPSpinnerHandler wpspinnerListener = new WPSpinnerHandler();
+        jspPrevNextWp.addChangeListener(wpspinnerListener);
+        DeleteWaypointHandler delwpbtnListener = new DeleteWaypointHandler();
+        jbtDeleteWp.addActionListener(delwpbtnListener);
+        SaveFileHandler savewpbtnListener = new SaveFileHandler();
+        jbtSave.addActionListener(savewpbtnListener);
+        LoadFileHandler loadwpbtnListener = new LoadFileHandler();
+        jbtLoad.addActionListener(loadwpbtnListener);
+      
+        jXMapKit1.getMainMap().addMouseMotionListener(new MouseMotionListener() {
+			public void mouseDragged(MouseEvent arg0) {
+				 statusMessageLabel.setText(jXMapKit1.getCenterPosition().toString());
+				
+			}
 
+			public void mouseMoved(MouseEvent arg0) {
+				 statusMessageLabel.setText(jXMapKit1.getCenterPosition().toString());				
+			}        	
+        });
+        
+        //add list of countries from the country.txt file
+        jcbCountry.addItem("");
+        InputStream is = this.getClass().getResourceAsStream("country.txt");
+        Scanner tmpScan = new Scanner(is);
+        int endL = Integer.parseInt(tmpScan.nextLine());
+        for (int i = 0; i < endL; i++)
+        {
+        	jcbCountry.addItem(tmpScan.nextLine());
+			double tmpLat = Double.parseDouble(tmpScan.nextLine());
+			double tmpLong = Double.parseDouble(tmpScan.nextLine());
+
+			Waypoint wp = new Waypoint(tmpLat, tmpLong);
+			countryList.add(wp);			
+        }
+        tmpScan.close();
+        
+        
+        //add list of cities from the city.txt file
+        jcbCity.addItem("");
+        is = this.getClass().getResourceAsStream("city.txt");
+        tmpScan = new Scanner(is);
+        endL = Integer.parseInt(tmpScan.nextLine());
+        for (int i = 0; i < endL; i++)
+        {
+        	jcbCity.addItem(tmpScan.nextLine());
+			double tmpLat = Double.parseDouble(tmpScan.nextLine());
+			double tmpLong = Double.parseDouble(tmpScan.nextLine());
+
+			Waypoint wp = new Waypoint(tmpLat, tmpLong);
+			cityList.add(wp);			
+        }
+        tmpScan.close();
+        
+        // *** end code insertion ***       
+        //jcbCountry.addItem("Hihi");
+        /*InputStream is = this.getClass().getResourceAsStream("country.txt");
+        Scanner tmpScan = new Scanner(is);
+        jlbByCoord.setText(tmpScan.nextLine());*/
+        
         org.jdesktop.layout.GroupLayout mainPanelLayout = new org.jdesktop.layout.GroupLayout(mainPanel);
         mainPanel.setLayout(mainPanelLayout);
         mainPanelLayout.setHorizontalGroup(
@@ -206,10 +528,10 @@ public class MapView extends FrameView {
             .add(jtbToolbar)
             .add(mainPanelLayout.createSequentialGroup()            	
                 //.add(jButton1)               
-                .add(containerPanel)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(containerPanel))
+                //.addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 //.add(jButton2)                
-                .add(183, 183, 183))
+                //.add(183, 183, 183))
             .add(jXMapKit1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 424, Short.MAX_VALUE)
         );
         mainPanelLayout.setVerticalGroup(
@@ -284,7 +606,7 @@ public class MapView extends FrameView {
         setMenuBar(menuBar);
         setStatusBar(statusPanel);
     }// </editor-fold>//GEN-END:initComponents
-    
+          
     //inserted by Michael Afidchao
     //add buttons to the JToolBar that shows/hides the panel
     protected void initToolBar(JToolBar toolbar)
@@ -298,11 +620,226 @@ public class MapView extends FrameView {
     	}
     	
     	JButton button = new JButton("Show/Hide Controls");
+    	button.setBorder(BorderFactory.createLineBorder(Color.black, 1, true));    	
     	button.addActionListener(new ToolBarHandler());
     	toolbar.add(button);
     	toolbar.setFloatable(false);    	
     }
+    
+    /* inserted by Michael Afidchao
+     * handle the boundaries of Latitude co-ordinates
+     * ensure that latitude is within -/+90 
+     */
+    public double checkLatitude(double lat)
+    {
+    	if (lat < -90)
+    		lat = -90;
+    	else if (lat > 90)
+    		lat = 90;
+    	return lat;
+    }
+    
+    /* inserted by Michael Afidchao
+     * handle the boundaries of longitude co-ordinates
+     * ensure that longitude is within -/+180
+     */
+    public double checkLongitude(double lon)
+    {
+    	if (lon < -180)
+    		lon = -180;
+    	else if (lon > 180)
+    		lon = 180;
+    	return lon;
+    }
+    
+    /* inserted by Michael Afidchao
+     * Event Handler for the Latitude/Longitude search button
+     */
+    class LatLongBtnHandler implements ActionListener
+    {
+    	public void actionPerformed (ActionEvent e)
+    	{
+    		//set null and blank values to 0
+    		if (jtfLatitude.getText() == null || jtfLatitude.getText().trim().equals(""))       		
+    			jtfLatitude.setText("0");    		
+    		if (jtfLongitude.getText() == null || jtfLongitude.getText().trim().equals(""))
+    			jtfLongitude.setText("0");
+    		
+    		//handle the boundaries of latitude/longitude
+    		jtfLatitude.setText(Double.toString(checkLatitude(Double.parseDouble(jtfLatitude.getText()))));
+    		jtfLongitude.setText(Double.toString(checkLongitude(Double.parseDouble(jtfLongitude.getText()))));
 
+    		jXMapKit1.setCenterPosition(new GeoPosition(Double.parseDouble(jtfLatitude.getText()), Double.parseDouble(jtfLongitude.getText())));
+    	}
+    }
+    
+    /* inserted by Michael Afidchao
+     * Event Handler for the Waypoint addition button
+     */
+    class AddWaypointHandler implements ActionListener
+    {
+    	public void actionPerformed(ActionEvent e)
+    	{
+    		waypointList.add(new Waypoint(jXMapKit1.getCenterPosition()));
+    		waypointModel.setMaximum(Integer.parseInt(waypointModel.getMaximum().toString()) + 1);
+    	}
+    }
+    
+    /* inserted by Michael Afidchao
+     * Event Handler for the Waypoint deletion button
+     */
+    class DeleteWaypointHandler implements ActionListener
+    {
+    	public void actionPerformed (ActionEvent e)
+    	{
+    		int tmpWp = Integer.parseInt(waypointModel.getNumber().toString());
+    		if (tmpWp != 0)   		
+    		{
+    			waypointList.remove(tmpWp - 1);
+    			
+    			//modify the spinner so the current value is the previous one 
+    			//and decrease the maximum value
+    			waypointModel.setValue(tmpWp - 1);
+    			waypointModel.setMaximum(Integer.parseInt(waypointModel.getMaximum().toString()) - 1);
+    		}
+    	}
+    }
+    
+    /* inserted by Michael Afidchao
+     * Event Handler for the Go To Waypoint button
+     */
+    class GoToWaypointHandler implements ActionListener
+    {
+    	public void actionPerformed(ActionEvent e)
+    	{
+    		int tmpWp = Integer.parseInt(waypointModel.getNumber().toString());
+    		if (tmpWp != 0)
+    			jXMapKit1.setCenterPosition(waypointList.get(tmpWp - 1).getPosition());
+    	}
+    }
+    
+    /* inserted by Michael Afidchao
+     * Event Handler for the Save Waypoints File button
+     */
+    class SaveFileHandler implements ActionListener 
+    {
+    	public void actionPerformed(ActionEvent e)
+    	{
+    		JFileChooser fc = new JFileChooser();
+    		int tmpReturn = fc.showSaveDialog(null);
+    		if (tmpReturn == JFileChooser.APPROVE_OPTION)
+    		{
+    			File filename = fc.getSelectedFile();
+    			try
+    			{
+    				Writer fileOut = new OutputStreamWriter (new FileOutputStream(filename));
+    				try
+    				{
+    					fileOut.write(waypointList.size() + "\n");
+    					for (int i = 0; i < waypointList.size(); i++)
+    					{    					
+    					
+    						fileOut.write(waypointList.get(i).getPosition().getLatitude() + "\n");
+    						fileOut.write(waypointList.get(i).getPosition().getLongitude() + "\n");
+    					}
+    				}
+    				catch (IOException ex)  //catch exceptions thrown by bad file output writing
+    				{    					
+    				}
+    				finally{
+    					fileOut.close();
+    				}    		    			
+    			} 
+    			catch (IOException ex) //catch exception thrown by invalid opening of file for output
+    			{    			
+    				
+    			}    			
+    		}
+    	}
+    
+    }
+    
+    /* inserted by Michael Afidchao
+     * Event Handler for the Load Waypoints File button
+     */
+    class LoadFileHandler implements ActionListener
+    {
+    	public void actionPerformed(ActionEvent e)
+    	{
+    		JFileChooser fc = new JFileChooser();
+    		int tmpReturn = fc.showSaveDialog(null);
+    		
+    		int tmpSize;
+    		List<Waypoint> tmpWpList = new ArrayList<Waypoint>();
+    		
+    		if (tmpReturn == JFileChooser.APPROVE_OPTION)    		
+    		{
+    			File filename = fc.getSelectedFile();
+    			try
+    			{
+    				Scanner tmpScan = new Scanner(new FileInputStream(filename));
+
+    				try
+    				{
+    					//the first line should be a number that stores the amount of
+    					//waypoints stored in the file
+    					tmpSize = Integer.parseInt(tmpScan.nextLine());
+    					
+    					for (int i = 0; i < tmpSize; i++)
+    					{
+    						double tmpLat = Double.parseDouble(tmpScan.nextLine());
+    						double tmpLong = Double.parseDouble(tmpScan.nextLine());
+
+    						Waypoint wp = new Waypoint(tmpLat, tmpLong);
+    						tmpWpList.add(wp);
+    						jlbByName.setText(wp.getPosition().toString());
+    					}
+    					
+    					//set the waypoint list to the loaded list and reset the spinner
+    					//value to 0 and maximum value to the new maximum
+    					waypointList = tmpWpList;
+    					waypointModel.setValue(0);
+    					waypointModel.setMaximum(tmpSize);
+    				} 
+    				catch (Exception ex)  //catch all possible exceptions after successful file open
+    				{    				
+    					
+    				}
+    				finally{
+    					tmpScan.close();
+    				}    				    			
+    			} catch (IOException ex) //catch exception thrown by invalid file opening for input
+    			{    			
+    				
+    			}
+    		}    		
+    	}
+    
+    }
+    
+    /* inserted by Michael Afidchao
+     * Event Handler for the Waypoint Spinner
+     * alters the Lat/Long waypoint labels
+     */
+    class WPSpinnerHandler implements ChangeListener
+    {
+    	public void stateChanged(ChangeEvent e)
+    	{
+    		int tmpWp = Integer.parseInt(waypointModel.getNumber().toString());
+    		if (tmpWp == 0)
+    		{
+    			jlbWpLat.setText("Latitude: n/a");
+    			jlbWpLong.setText("Longitude: n/a");
+    		}
+    		else
+    		{
+    			DecimalFormat tmpFormat = new DecimalFormat("0.000000");    			
+    			jlbWpLat.setText("Latitude: " + tmpFormat.format(waypointList.get(tmpWp - 1).getPosition().getLatitude()));
+    			jlbWpLong.setText("Longitude: " + tmpFormat.format(waypointList.get(tmpWp - 1).getPosition().getLongitude()));
+    		}    		
+    	}    
+    }
+    
     @org.jdesktop.application.Action
     public void goChicago() {
         // put your action code here
