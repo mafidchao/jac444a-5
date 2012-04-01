@@ -1,72 +1,43 @@
-/*
- * MapView.java
+/**
+ * Mapview class
+ * This class contains code for generating a Map using JXMapViewer,
+ * as well as added functionality that allows for searching co-ordinates
+ * by address, reverse geocoding the current latitude/longitude, and
+ * a waypoint storage system.
  * 
  * Original sample code provided by Josh Marinacci - http://today.java.net/pub/a/today/2007/10/30/building-maps-into-swing-app-with-jxmapviewer.html
+ * Modifications added by Michael Afidchao
  * 
- * JAC444A - Assignment 2
- * Additions made by:
- * Michael Afidchao
- * 062-699-103
- * 
+ * @author Michael Afidchao
+ * @course JAC444A
+ * @version 1.0
+ * @date April 1, 2012
  */
-
-
 
 package mapapp;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.Graphics2D;
-import java.awt.GridBagLayout;
-import java.awt.GridLayout;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+
+import java.net.URL;
+import java.net.URLConnection;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Scanner;
+import java.util.Set;
+
+import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import javax.swing.text.NumberFormatter;
 
 import org.jdesktop.application.Action;
 import org.jdesktop.application.ResourceMap;
 import org.jdesktop.application.SingleFrameApplication;
 import org.jdesktop.application.FrameView;
 import org.jdesktop.application.TaskMonitor;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowFocusListener;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.net.URL;
-import java.net.URLConnection;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Scanner;
-import java.util.Set;
-//import javax.swing.Timer;
-//import javax.swing.Icon;
-//import javax.swing.JDialog;
-//import javax.swing.JFrame;
-import javax.swing.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
-import javax.swing.text.NumberFormatter;
-
 import org.jdesktop.swingx.JXMapViewer;
 import org.jdesktop.swingx.mapviewer.GeoPosition;
 import org.jdesktop.swingx.mapviewer.Waypoint;
@@ -75,8 +46,11 @@ import org.jdesktop.swingx.mapviewer.WaypointRenderer;
 import org.jdesktop.swingx.mapviewer.wms.WMSService;
 import org.jdesktop.swingx.mapviewer.wms.WMSTileFactory;
 
+//import java.beans.PropertyChangeEvent;
+//import java.beans.PropertyChangeListener;
+
 /**
- * The application's main frame.
+ * The application's main frame. This contains all components of the application.
  */
 public class MapView extends FrameView {
     // Variables added by Michael Afidchao
@@ -93,14 +67,12 @@ public class MapView extends FrameView {
     private JComboBox<String> jcbCountry;
     private JComboBox<String> jcbCity;
     private JTextField jtfAddress;
-    private JButton jbtByName; //, jbtByCountry, jbtByCity, jbtByAddress;
+    private JButton jbtByName;
     
     private JLabel jlbLatitude, jlbLongitude, jlbByCoord;
-    //private JTextField jtfLatitude, jtfLongitude;
     private JFormattedTextField jtfLatitude, jtfLongitude;
     private JButton jbtSearchCoord, jbtByCoord;
     
-    //private JButton jbtPrevWp, jbtNextWp;
     private JLabel jlbPrevNextWp, jlbWaypoint, jlbWpLat, jlbWpLong;
     private JSpinner jspPrevNextWp;
     private JButton jbtDeleteWp, jbtAddWp, jbtGoToWp;
@@ -108,11 +80,16 @@ public class MapView extends FrameView {
     private JButton jbtLoad;
     
     private SpinnerNumberModel waypointModel;    
-    //private Set<Waypoint> waypointList = new HashSet<Waypoint>();
     private ArrayList<Waypoint> waypointList;
     private ArrayList<Waypoint> countryList;
     private ArrayList<Waypoint> cityList;
 
+    /**
+     * Constructor for the MapView class. 
+     * Code provided from the original Application 2 source code by Josh Marinacci
+     * http://today.java.net/pub/a/today/2007/10/30/building-maps-into-swing-app-with-jxmapviewer.html
+     * @param app 
+     */
     public MapView(SingleFrameApplication app) {
         super(app);
 
@@ -178,6 +155,12 @@ public class MapView extends FrameView {
         });
     }
 
+    /**
+     * Show the about box.
+     * Code provided from the original Application 2 source code by Josh Marinacci
+     * http://today.java.net/pub/a/today/2007/10/30/building-maps-into-swing-app-with-jxmapviewer.html 
+     * @param e
+     */
     @Action
     public void showAboutBox(ActionEvent e) {
         if (aboutBox == null) {
@@ -188,7 +171,17 @@ public class MapView extends FrameView {
         MapApp.getApplication().show(aboutBox);
     }
 
-    /** This method is called from within the constructor to
+    /** 
+     * Initialize all components of the application. Contents have been generated automatically
+     * by NetBeans IDE, but modified manually under the Eclipse IDE.
+     * 
+     * Code provided from the original Application 2 source code by Josh Marinacci
+     * http://today.java.net/pub/a/today/2007/10/30/building-maps-into-swing-app-with-jxmapviewer.html
+     * 
+     * Contains modifications as commented by Michael Afidchao.
+     * 
+     * Original NetBeans IDE comments:
+     * This method is called from within the constructor to
      * initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is
      * always regenerated by the Form Editor.
@@ -224,7 +217,7 @@ public class MapView extends FrameView {
         jButton2.setAction(actionMap.get("addWaypoint")); // NOI18N
         jButton2.setName("jButton2"); // NOI18N
         
-        //*** code inserted by Michael Afidchao ***
+        //****** code inserted by Michael Afidchao ******
         jtbToolbar = new JToolBar("Show/Hide Panel");
         initToolBar (jtbToolbar);  //initialize tool bar properties with method
         containerPanel = new JPanel();
@@ -237,27 +230,20 @@ public class MapView extends FrameView {
         jlbAddress = new JLabel("Address");
         jlbByName = new JLabel("Search by Name");
         jbtByName = new JButton ("Search Address");
-        //jbtByCountry = new JButton ("Country");
-        //jbtByCity = new JButton ("City");
-        //jbtByAddress = new JButton ("Address");
         jcbCountry = new JComboBox<String>();
         jcbCity = new JComboBox<String>();
-        jtfAddress = new JTextField();
-                
+        jtfAddress = new JTextField();                
         jlbByCoord = new JLabel("Search by Coordinates");
         jlbLongitude = new JLabel("Longitude");
         jlbLatitude = new JLabel("Latitude");
         
-        //jtfLongitude = new JTextField(20);
-        //jtfLatitude = new JTextField(20);
         jtfLongitude = new JFormattedTextField(new NumberFormatter(new DecimalFormat("0.000000")));
         jtfLatitude = new JFormattedTextField(new NumberFormatter(new DecimalFormat("0.000000")));
         jtfLatitude.setColumns(20);
         jtfLongitude.setColumns(20);
         
         jbtSearchCoord = new JButton("Display Current Location Info");
-        jbtByCoord = new JButton("Go to Coordinates");
-        
+        jbtByCoord = new JButton("Go to Coordinates");        
         jlbWaypoint = new JLabel ("Waypoints Management");
         jlbPrevNextWp = new JLabel("Waypoint");
         jlbWpLat = new JLabel ("Latitude: n/a");
@@ -266,8 +252,7 @@ public class MapView extends FrameView {
         waypointList = new ArrayList<Waypoint>();
         countryList = new ArrayList<Waypoint>();
         cityList = new ArrayList<Waypoint>();
-        //waypointList.add(new Waypoint(0, 0));
-        //waypointModel = new SpinnerListModel(waypointList);
+
         waypointModel = new SpinnerNumberModel(0,0,0,1);
         jspPrevNextWp = new JSpinner(waypointModel);        
         jbtGoToWp = new JButton("Go to Waypoint");
@@ -276,14 +261,9 @@ public class MapView extends FrameView {
         jbtSave = new JButton("Save Waypoints File");
         jbtLoad = new JButton("Load Waypoints File");
         
-        //jspPrevNextWp.setSize(100, jspPrevNextWp.getSize().height);
-        jspPrevNextWp.setPreferredSize(new Dimension(50, 20));
-        
-        //byNamePanel.setLayout(new BoxLayout(byNamePanel, BoxLayout.Y_AXIS));        
+        jspPrevNextWp.setPreferredSize(new Dimension(50, 20));   
         byNamePanel.setLayout(new BorderLayout());
-        //byCoordPanel.setLayout(new BoxLayout(byCoordPanel, BoxLayout.Y_AXIS));
         byCoordPanel.setLayout(new BorderLayout());
-        //waypointPanel.setLayout(new BoxLayout(waypointPanel, BoxLayout.Y_AXIS));
         waypointPanel.setLayout(new BorderLayout());
         containerPanel.setLayout(new GridLayout(1, 3));
         
@@ -302,79 +282,26 @@ public class MapView extends FrameView {
         JPanel tmpjp5 = new JPanel();        
         JPanel tmpCenter = new JPanel();
 
-        
-        /*tmpjp1.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp2.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp2a.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp2b.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp3.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp3a.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp3b.setBorder(BorderFactory.createLineBorder(Color.black));        
-        tmpjp4.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp4a.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp4b.setBorder(BorderFactory.createLineBorder(Color.black));        
-        tmpjp5.setBorder(BorderFactory.createLineBorder(Color.black));*/
-        
-        //tmpjp2.setLayout(new GridBagLayout());
         tmpjp2.setLayout(new GridLayout(0,2));
         tmpjp3.setLayout(new GridLayout(0,2));
         tmpjp4.setLayout(new GridLayout(0,2));
-        //tmpjp2.setLayout(new BoxLayout(tmpjp2, BoxLayout.X_AXIS));        
-        //tmpjp3.setLayout(new BoxLayout(tmpjp3, BoxLayout.X_AXIS));
-        //tmpjp4.setLayout(new BoxLayout(tmpjp4, BoxLayout.X_AXIS));
         tmpCenter.setLayout(new BoxLayout(tmpCenter, BoxLayout.Y_AXIS));
 
-        
-        /*tmpjp2a.setMaximumSize(new Dimension(100, 40));
-        tmpjp3a.setMaximumSize(new Dimension(100, 40));
-        tmpjp4a.setMaximumSize(new Dimension(100, 40));*/
-        //tmpjp2a.setAlignmentX(Component.RIGHT_ALIGNMENT);
-        //tmpjp2a.setAlignmentY(10);
-        //jlbCountry.setAlignmentX(Component.LEFT_ALIGNMENT);
-        //jcbCountry.setPreferredSize(new Dimension(10, 20));
-        //jcbCountry.setMaximumSize(new Dimension(100, 20));
-        //jlbCountry.setPreferredSize(new Dimension(100, jlbCountry.getSize().height));
         jlbCountry.setHorizontalAlignment(SwingConstants.LEFT);
         jlbCity.setHorizontalAlignment(SwingConstants.LEFT);
         jlbAddress.setHorizontalAlignment(SwingConstants.LEFT);
-        //jcbCountry.setMaximumSize(new Dimension(4, 5));
+
         tmpjp2.setMaximumSize(new Dimension(200, 20));
         tmpjp3.setMaximumSize(new Dimension(200, 20));
-        tmpjp4.setMaximumSize(new Dimension(200, 20));
-        //tmpjp3.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
-        //tmpjp4.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
-        //tmpCenter.setMaximumSize(new Dimension(50, 200));
+        tmpjp4.setMaximumSize(new Dimension(200, 20));     
         
-        //jcbCountry.setAlignmentX(10);
-        
-        
-        //jlbCity.setPreferredSize(new Dimension(100, 10));
-        //jlbCity.setHorizontalAlignment(SwingConstants.RIGHT);
-        //jlbAddress.setPreferredSize(new Dimension(100, jlbAddress.getSize().height));
-        //jlbAddress.setHorizontalAlignment(SwingConstants.RIGHT);
-        
-        //jcbCity.setMaximumSize(new Dimension(100, 20));
-        //jcbCountry.setMaximumSize(new Dimension(100, 20));
-        //jtfAddress.setMaximumSize(new Dimension(100, 20));
-        
-        tmpjp1.add(jlbByName);
-        
+        tmpjp1.add(jlbByName);        
         tmpjp2.add(jlbCountry);
-        //tmpjp2.add(new JLabel(" "));
-        tmpjp2.add(jcbCountry);
-        //tmpjp2.add(new JLabel(" "));
-        
-        
+        tmpjp2.add(jcbCountry);               
         tmpjp3.add(jlbCity);
-        //tmpjp3.add(new JLabel(" "));
-        tmpjp3.add(jcbCity);
-        //tmpjp3.add(new JLabel(" "));
-        
+        tmpjp3.add(jcbCity);        
         tmpjp4.add(jlbAddress);
-        //tmpjp4.add(new JLabel(" "));
         tmpjp4.add(jtfAddress);
-        //tmpjp4.add(new JLabel(" "));
-        
         tmpjp5.add(jbtByName);
         
         tmpCenter.add(tmpjp2);
@@ -396,12 +323,6 @@ public class MapView extends FrameView {
         tmpCenter = new JPanel();
         tmpCenter.setLayout(new BoxLayout(tmpCenter, BoxLayout.Y_AXIS));
 
-        /*tmpjp1.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp2.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp3.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp4.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp5.setBorder(BorderFactory.createLineBorder(Color.black));*/
-        
         tmpjp1.add(jlbByCoord);
         tmpjp2.add(jlbLatitude);
         tmpjp2.add(jtfLatitude);
@@ -415,12 +336,9 @@ public class MapView extends FrameView {
         tmpCenter.add(tmpjp4);
         
         byCoordPanel.add(tmpjp1, BorderLayout.PAGE_START);
-        //byCoordPanel.add(tmpjp2);
-        //byCoordPanel.add(tmpjp3);
         byCoordPanel.add(tmpCenter, BorderLayout.CENTER);
         byCoordPanel.add(tmpjp5, BorderLayout.PAGE_END);
-        
-        
+                
         //set up the Waypoint panel
         tmpjp1 = new JPanel();
         tmpjp2 = new JPanel();
@@ -429,12 +347,6 @@ public class MapView extends FrameView {
         tmpjp5 = new JPanel();
         tmpCenter = new JPanel();
         tmpCenter.setLayout(new BoxLayout(tmpCenter, BoxLayout.Y_AXIS));        
-        
-        /*tmpjp1.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp2.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp3.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp4.setBorder(BorderFactory.createLineBorder(Color.black));
-        tmpjp5.setBorder(BorderFactory.createLineBorder(Color.black));*/
         
         tmpjp1.add(jlbWaypoint);
         tmpjp2.add(jlbPrevNextWp);
@@ -452,12 +364,9 @@ public class MapView extends FrameView {
         tmpCenter.add(tmpjp4);
         
         waypointPanel.add(tmpjp1, BorderLayout.PAGE_START);
-        //waypointPanel.add(tmpjp2);
-        //waypointPanel.add(tmpjp3);
         waypointPanel.add(tmpCenter, BorderLayout.CENTER);
         waypointPanel.add(tmpjp5, BorderLayout.PAGE_END);
-        
-        
+                
         //add all panels to the main container panel
         containerPanel.add(byNamePanel);
         containerPanel.add(byCoordPanel);
@@ -533,21 +442,18 @@ public class MapView extends FrameView {
         tmpScan.close();
         
         //remove default waypoint
-        drawWaypoints();
- 
+        drawWaypoints(); 
         
-        // *** end code insertion ***       
+        // ****** end code insertion ******       
         
         org.jdesktop.layout.GroupLayout mainPanelLayout = new org.jdesktop.layout.GroupLayout(mainPanel);
         mainPanel.setLayout(mainPanelLayout);
         mainPanelLayout.setHorizontalGroup(
             mainPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
             .add(jtbToolbar)
-            .add(mainPanelLayout.createSequentialGroup()            	
-                //.add(jButton1)               
+            .add(mainPanelLayout.createSequentialGroup()            	   
                 .add(containerPanel))
-                //.addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                //.add(jButton2)                
+                //.addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)    
                 //.add(183, 183, 183))
             .add(jXMapKit1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 424, Short.MAX_VALUE)
         );
@@ -557,10 +463,8 @@ public class MapView extends FrameView {
                 .add(jXMapKit1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 234, Short.MAX_VALUE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jtbToolbar)
-                .add(mainPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)                	
-                    //.add(jButton1)              
+                .add(mainPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)                	     
                     .add(containerPanel)))
-                    //.add(jButton2)))
         );        
 
         menuBar.setName("menuBar"); // NOI18N
@@ -624,8 +528,10 @@ public class MapView extends FrameView {
         setStatusBar(statusPanel);
     }// </editor-fold>//GEN-END:initComponents
           
-    //inserted by Michael Afidchao
-    //add buttons to the JToolBar that shows/hides the panel
+    /**
+     * Add buttons to the JToolBar that shows/hides the main container panel 
+     * @param toolbar JToolBar component to be modified
+     */
     protected void initToolBar(JToolBar toolbar)
     {
     	class ToolBarHandler implements ActionListener
@@ -643,9 +549,12 @@ public class MapView extends FrameView {
     	toolbar.setFloatable(false);    	
     }
     
-    /* inserted by Michael Afidchao
-     * handle the boundaries of Latitude co-ordinates
-     * ensure that latitude is within -/+90 
+    
+    /**
+     * Handles the boundaries of Latitude co-ordinates,
+     * ensuring that latitude is within -/+90 
+     * @param lat The latitude value that will be processed
+     * @return latitude
      */
     public double checkLatitude(double lat)
     {
@@ -656,9 +565,12 @@ public class MapView extends FrameView {
     	return lat;
     }
     
-    /* inserted by Michael Afidchao
-     * handle the boundaries of longitude co-ordinates
-     * ensure that longitude is within -/+180
+
+    /**
+     * Handles the boundaries of longitude co-ordinates, 
+     * ensuring that longitude is within -/+180
+     * @param lon The longitude value that will be processed
+     * @return longitude
      */
     public double checkLongitude(double lon)
     {
@@ -669,13 +581,17 @@ public class MapView extends FrameView {
     	return lon;
     }
     
-    /* inserted by Michael Afidchao
-     * draw the waypoints on the overlay
+    /**
+     * Draws the waypoints on the overlay.
      */
     public void drawWaypoints() {
         Set<Waypoint> waypoints = new HashSet<Waypoint>();
         waypoints.addAll(waypointList);        
         
+        /* Create a red X
+         * Code provided from the original Application 2 source code by Josh Marinacci
+         * http://today.java.net/pub/a/today/2007/10/30/building-maps-into-swing-app-with-jxmapviewer.html
+         */
         WaypointPainter painter = new WaypointPainter();            
         painter.setWaypoints(waypoints);
         painter.setRenderer(new WaypointRenderer() {
@@ -689,12 +605,14 @@ public class MapView extends FrameView {
         jXMapKit1.getMainMap().setOverlayPainter(painter);       
     }
 
-    
+       
     /**
-     * inserted by Michael Afidchao 
-     * Event Handler for the Search by Address button
-     * uses the Nominatim tool on OpenStreetMap.org: http://wiki.openstreetmap.org/wiki/Nominatim#Reverse_Geocoding_.2F_Address_lookup 
-     * HTTP Request code provided by: http://stackoverflow.com/questions/1359689/how-to-send-http-request-in-java
+     * Inner class event handler for the Search by Address button. Moves the current location to the given address in the
+     * address text field.
+     * 
+     * Uses the Nominatim tool on OpenStreetMap.org: http://wiki.openstreetmap.org/wiki/Nominatim#Reverse_Geocoding_.2F_Address_lookup 
+     * HTTP Request code provided by: http://stackoverflow.com/a/1359702
+     * 
      */
     class ByAddressBtnHandler implements ActionListener
     {
@@ -702,12 +620,6 @@ public class MapView extends FrameView {
     		URL address;
     		try
     		{
-    			//yahoo = new URL("http://www.yahoo.com/");
-                //address = new URL("http://nominatim.openstreetmap.org/reverse?format=xml&lat=52.5487429714954&lon=-1.81602098644987&addressdetails=1");
-    			//http://nominatim.openstreetmap.org/search?q=Toronto,+ON,+Canada&format=xml
-    			//address = new URL("http://nominatim.openstreetmap.org/search/" + jtfAddress.getText().trim() + "?format=xml");
-    			//address = new URL("http://nominatim.openstreetmap.org/search/135%20pilkington%20avenue,%20birmingham?format=xml");
-    			//address = new URL("http://nominatim.openstreetmap.org/search/70%20the%20pond%20road,Toronto?format=xml");
     			String tmpSearch = jtfAddress.getText().trim();
     			tmpSearch = tmpSearch.replaceAll(" ", "+");  //replace all blank spaces with a + to create a proper URL
     			address = new URL("http://nominatim.openstreetmap.org/search?q=" + tmpSearch + "&format=xml");
@@ -749,8 +661,11 @@ public class MapView extends FrameView {
     	}
     }
     
-    /* inserted by Michael Afidchao
-     * Event Handler for jumping to locations when selecting an item from the Country/City combo boxes
+
+    /**
+     * Inner class event handler for the Country/City location combo boxes. Jumps to the selected Country/City
+     * location when selected.
+     *  
      */
     class LocationCBHandler implements ItemListener {
     	@SuppressWarnings("unchecked")
@@ -770,8 +685,10 @@ public class MapView extends FrameView {
     	}
     }
     
-    /* inserted by Michael Afidchao
-     * Event Handler for the Display Address Info button
+    
+    /**
+     * Inner class event handler for the Display Info button. Displays a box containing
+     * address information for the current location.
      */
     class DisplayInfoBtnHandler implements ActionListener
     {
@@ -787,22 +704,18 @@ public class MapView extends FrameView {
     			String tmpSearch = jtfAddress.getText().trim();
     			tmpSearch = tmpSearch.replaceAll(" ", "+");  //replace all blank spaces with a + to create a proper URL
     			
-    			//http://nominatim.openstreetmap.org/reverse?format=xml&lat=52.5487429714954&lon=-1.81602098644987&addressdetails=1
     			address = new URL("http://nominatim.openstreetmap.org/reverse?format=xml&lat=" + tmpLat + "&lon=" + tmpLong + "&addressdetails=1");
     			
     			URLConnection tmpConn = address.openConnection();		    		
     			BufferedReader in = new BufferedReader(new InputStreamReader(tmpConn.getInputStream()));
     			
     			String tmpInput;
-    			//double tmpLat = 999.0, tmpLong = 999.0;    //0.0 is a valid location, despite nothing existing there (yet)
-    			//while ((tmpInput = in.readLine()) != null && tmpLat != 0.0) {    				
     			while ((tmpInput = in.readLine()) != null) {
     				System.out.println (tmpInput);
     				//check if we have entered the <addressparts> block
     				if (tmpInput.contains("<addressparts>"))
     				{
     					//extract only certain elements of the block: number, street, city, state and country
-   						//tmpStr += tmpInput;
     					if (tmpInput.contains("<house_number>"))
     						tmpStr += tmpInput.substring(tmpInput.indexOf("<house_number>") + 14, tmpInput.indexOf("</house_number>")) + "\n";
     					if (tmpInput.contains("<road>"))
@@ -812,10 +725,8 @@ public class MapView extends FrameView {
     					if (tmpInput.contains("<state>"))
     						tmpStr += tmpInput.substring(tmpInput.indexOf("<state>") + 7, tmpInput.indexOf("</state>")) + "\n";
     					if (tmpInput.contains("<country>"))
-    						tmpStr += tmpInput.substring(tmpInput.indexOf("<country>") + 9, tmpInput.indexOf("</country>")) + "\n";
-   						
-    				}
-    				    				
+    						tmpStr += tmpInput.substring(tmpInput.indexOf("<country>") + 9, tmpInput.indexOf("</country>")) + "\n";   						
+    				}    				    				
     			}
     			in.close();
     			
@@ -833,15 +744,16 @@ public class MapView extends FrameView {
     			catch (Exception ex)
     			{
     				System.out.println (ex.getMessage());
-    				// jtfAddress.setText("Invalid address");
     				tmpStr = "No address data available";
     			}    			
     		JOptionPane.showMessageDialog( null, tmpStr, "Reverse Geocode", JOptionPane.INFORMATION_MESSAGE );
     	}
     }
     
-    /* inserted by Michael Afidchao
-     * Event Handler for the Latitude/Longitude search button
+    
+    /**
+     * Inner class event handler for the Latitude/Longitude search button. Jumps to
+     * the given co-ordinates in the latitude/longitude text fields.
      */
     class LatLongBtnHandler implements ActionListener
     {
@@ -861,8 +773,10 @@ public class MapView extends FrameView {
     	}
     }
     
-    /* inserted by Michael Afidchao
-     * Event Handler for the Waypoint addition button
+
+    /**
+     * Inner class event handler for the Add Waypoint button. Adds a waypoint
+     * to the Waypoint array list.
      */
     class AddWaypointHandler implements ActionListener
     {
@@ -875,8 +789,10 @@ public class MapView extends FrameView {
     	}
     }
     
-    /* inserted by Michael Afidchao
-     * Event Handler for the Waypoint deletion button
+    
+    /**
+     * Inner class event handler for the Delete Waypoint button. Removes the
+     * current waypoint from the Waypoint array list. 
      */
     class DeleteWaypointHandler implements ActionListener
     {
@@ -897,8 +813,10 @@ public class MapView extends FrameView {
     	}
     }
     
-    /* inserted by Michael Afidchao
-     * Event Handler for the Go To Waypoint button
+    
+    /**
+     * Inner class event handler for the Go To Waypoint button. Jumps to the
+     * co-ordinates stored in the selected waypoint.
      */
     class GoToWaypointHandler implements ActionListener
     {
@@ -910,8 +828,16 @@ public class MapView extends FrameView {
     	}
     }
     
-    /* inserted by Michael Afidchao
-     * Event Handler for the Save Waypoints File button
+    
+    /**
+     * Inner class event handler for the Save Waypoints File button. Saves the array list of
+     * waypoints to a text file.
+     * 
+     * The text file is stored in the following format:
+     * (# of waypoints)\n
+     * Latitude\n
+     * Longitude\n
+     * (...repeat latitude\longitude for the rest of the waypoints)
      */
     class SaveFileHandler implements ActionListener 
     {
@@ -929,8 +855,7 @@ public class MapView extends FrameView {
     				{
     					fileOut.write(waypointList.size() + "\n");
     					for (int i = 0; i < waypointList.size(); i++)
-    					{    					
-    					
+    					{    					    					
     						fileOut.write(waypointList.get(i).getPosition().getLatitude() + "\n");
     						fileOut.write(waypointList.get(i).getPosition().getLongitude() + "\n");
     					}
@@ -952,9 +877,18 @@ public class MapView extends FrameView {
     
     }
     
-    /* inserted by Michael Afidchao
-     * Event Handler for the Load Waypoints File button
-     */
+    
+    /**
+     * Inner class event handler for the Load Waypoints File button. Loads a file of
+     * stored waypoints into the array list of waypoints. All current waypoints are
+     * lost.
+     * 
+     * The text file must be stored in the following format:
+     * (# of waypoints)\n
+     * Latitude\n
+     * Longitude\n
+     * (...repeat latitude/longitude for the rest of the waypoints)
+     */ 
     class LoadFileHandler implements ActionListener
     {
     	public void actionPerformed(ActionEvent e)
@@ -1011,9 +945,10 @@ public class MapView extends FrameView {
     
     }
     
-    /* inserted by Michael Afidchao
-     * Event Handler for the Waypoint Spinner
-     * alters the Lat/Long waypoint labels
+    
+    /**
+     * Inner class event handler for the Waypoint spinner. Alters the latitude/longitude
+     * waypoint labels.
      */
     class WPSpinnerHandler implements ChangeListener
     {
@@ -1034,34 +969,6 @@ public class MapView extends FrameView {
     	}    
     }
     
-    @org.jdesktop.application.Action
-    public void goChicago() {
-        // put your action code here
-        //jXMapKit1.setCenterPosition(new GeoPosition(41.881944,-87.627778));
-        jXMapKit1.setAddressLocation(new GeoPosition(41.881944,-87.627778));
-    }
-
-    @org.jdesktop.application.Action
-    public void addWaypoint() {
-        Set<Waypoint> waypoints = new HashSet<Waypoint>();
-        waypoints.add(new Waypoint(41.881944,-87.627778));
-        waypoints.add(new Waypoint(40.716667,-74));
-        
-        WaypointPainter painter = new WaypointPainter();
-        painter.setWaypoints(waypoints);
-        painter.setRenderer(new WaypointRenderer() {
-            public boolean paintWaypoint(Graphics2D g, JXMapViewer map, Waypoint wp) {
-                g.setColor(Color.RED);
-                g.drawLine(-5,-5,+5,+5);
-                g.drawLine(-5,+5,+5,-5);
-                return true;
-            }
-        });
-        
-        jXMapKit1.getMainMap().setOverlayPainter(painter);
-        // put your action code here
-    }
-
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton2;

@@ -1,5 +1,8 @@
-/*
- * MapApp.java
+/**
+ * MapApp class
+ * 
+ * Code provided from the original Application 2 source code by Josh Marinacci
+ * http://today.java.net/pub/a/today/2007/10/30/building-maps-into-swing-app-with-jxmapviewer.html
  */
 
 package mapapp;
