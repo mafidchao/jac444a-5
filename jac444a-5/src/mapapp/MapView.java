@@ -31,6 +31,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
@@ -38,14 +40,17 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowFocusListener;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URL;
+import java.net.URLConnection;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -93,7 +98,7 @@ public class MapView extends FrameView {
     private JLabel jlbLatitude, jlbLongitude, jlbByCoord;
     //private JTextField jtfLatitude, jtfLongitude;
     private JFormattedTextField jtfLatitude, jtfLongitude;
-    private JButton jbtByCoord;
+    private JButton jbtSearchCoord, jbtByCoord;
     
     //private JButton jbtPrevWp, jbtNextWp;
     private JLabel jlbPrevNextWp, jlbWaypoint, jlbWpLat, jlbWpLong;
@@ -104,9 +109,9 @@ public class MapView extends FrameView {
     
     private SpinnerNumberModel waypointModel;    
     //private Set<Waypoint> waypointList = new HashSet<Waypoint>();
-    private List<Waypoint> waypointList;
-    private List<Waypoint> countryList;
-    private List<Waypoint> cityList;
+    private ArrayList<Waypoint> waypointList;
+    private ArrayList<Waypoint> countryList;
+    private ArrayList<Waypoint> cityList;
 
     public MapView(SingleFrameApplication app) {
         super(app);
@@ -238,7 +243,7 @@ public class MapView extends FrameView {
         jcbCountry = new JComboBox<String>();
         jcbCity = new JComboBox<String>();
         jtfAddress = new JTextField();
-        
+                
         jlbByCoord = new JLabel("Search by Coordinates");
         jlbLongitude = new JLabel("Longitude");
         jlbLatitude = new JLabel("Latitude");
@@ -250,7 +255,8 @@ public class MapView extends FrameView {
         jtfLatitude.setColumns(20);
         jtfLongitude.setColumns(20);
         
-        jbtByCoord = new JButton("Search");
+        jbtSearchCoord = new JButton("Display Current Location Info");
+        jbtByCoord = new JButton("Go to Coordinates");
         
         jlbWaypoint = new JLabel ("Waypoints Management");
         jlbPrevNextWp = new JLabel("Waypoint");
@@ -400,17 +406,19 @@ public class MapView extends FrameView {
         tmpjp2.add(jlbLatitude);
         tmpjp2.add(jtfLatitude);
         tmpjp3.add(jlbLongitude);
-        tmpjp3.add(jtfLongitude);        
-        tmpjp4.add(jbtByCoord);
+        tmpjp3.add(jtfLongitude);
+        tmpjp4.add(jbtSearchCoord);
+        tmpjp5.add(jbtByCoord);
         
         tmpCenter.add(tmpjp2);
         tmpCenter.add(tmpjp3);
+        tmpCenter.add(tmpjp4);
         
         byCoordPanel.add(tmpjp1, BorderLayout.PAGE_START);
         //byCoordPanel.add(tmpjp2);
         //byCoordPanel.add(tmpjp3);
         byCoordPanel.add(tmpCenter, BorderLayout.CENTER);
-        byCoordPanel.add(tmpjp4, BorderLayout.PAGE_END);
+        byCoordPanel.add(tmpjp5, BorderLayout.PAGE_END);
         
         
         //set up the Waypoint panel
@@ -470,11 +478,20 @@ public class MapView extends FrameView {
         jbtSave.addActionListener(savewpbtnListener);
         LoadFileHandler loadwpbtnListener = new LoadFileHandler();
         jbtLoad.addActionListener(loadwpbtnListener);
+        jbtByName.addActionListener(new ByAddressBtnHandler());
+        jbtSearchCoord.addActionListener(new DisplayInfoBtnHandler());
+        LocationCBHandler cbListener = new LocationCBHandler();
+        jcbCountry.addItemListener(cbListener);
+        jcbCity.addItemListener(cbListener);
       
         jXMapKit1.getMainMap().addMouseMotionListener(new MouseMotionListener() {
-			public void mouseDragged(MouseEvent arg0) {
-				 statusMessageLabel.setText(jXMapKit1.getCenterPosition().toString());
-				
+			public void mouseDragged(MouseEvent arg0) {				 				 
+				 //jXMapKit allows for Longitude to go outside -+180, reset the position when looping to avoid this
+				 if (jXMapKit1.getCenterPosition().getLongitude() > 180) 
+					 jXMapKit1.setCenterPosition(new GeoPosition(jXMapKit1.getCenterPosition().getLatitude(), -180));
+				 else if (jXMapKit1.getCenterPosition().getLongitude() < -180) 
+					 jXMapKit1.setCenterPosition(new GeoPosition(jXMapKit1.getCenterPosition().getLatitude(), 180));
+				 statusMessageLabel.setText(jXMapKit1.getCenterPosition().toString());				
 			}
 
 			public void mouseMoved(MouseEvent arg0) {
@@ -515,11 +532,11 @@ public class MapView extends FrameView {
         }
         tmpScan.close();
         
+        //remove default waypoint
+        drawWaypoints();
+ 
+        
         // *** end code insertion ***       
-        //jcbCountry.addItem("Hihi");
-        /*InputStream is = this.getClass().getResourceAsStream("country.txt");
-        Scanner tmpScan = new Scanner(is);
-        jlbByCoord.setText(tmpScan.nextLine());*/
         
         org.jdesktop.layout.GroupLayout mainPanelLayout = new org.jdesktop.layout.GroupLayout(mainPanel);
         mainPanel.setLayout(mainPanelLayout);
@@ -653,6 +670,177 @@ public class MapView extends FrameView {
     }
     
     /* inserted by Michael Afidchao
+     * draw the waypoints on the overlay
+     */
+    public void drawWaypoints() {
+        Set<Waypoint> waypoints = new HashSet<Waypoint>();
+        waypoints.addAll(waypointList);        
+        
+        WaypointPainter painter = new WaypointPainter();            
+        painter.setWaypoints(waypoints);
+        painter.setRenderer(new WaypointRenderer() {
+            public boolean paintWaypoint(Graphics2D g, JXMapViewer map, Waypoint wp) {
+                g.setColor(Color.RED);
+                g.drawLine(-5,-5,+5,+5);
+                g.drawLine(-5,+5,+5,-5);
+                return true;
+            }
+        });
+        jXMapKit1.getMainMap().setOverlayPainter(painter);       
+    }
+
+    
+    /**
+     * inserted by Michael Afidchao 
+     * Event Handler for the Search by Address button
+     * uses the Nominatim tool on OpenStreetMap.org: http://wiki.openstreetmap.org/wiki/Nominatim#Reverse_Geocoding_.2F_Address_lookup 
+     * HTTP Request code provided by: http://stackoverflow.com/questions/1359689/how-to-send-http-request-in-java
+     */
+    class ByAddressBtnHandler implements ActionListener
+    {
+    	public void actionPerformed (ActionEvent e){
+    		URL address;
+    		try
+    		{
+    			//yahoo = new URL("http://www.yahoo.com/");
+                //address = new URL("http://nominatim.openstreetmap.org/reverse?format=xml&lat=52.5487429714954&lon=-1.81602098644987&addressdetails=1");
+    			//http://nominatim.openstreetmap.org/search?q=Toronto,+ON,+Canada&format=xml
+    			//address = new URL("http://nominatim.openstreetmap.org/search/" + jtfAddress.getText().trim() + "?format=xml");
+    			//address = new URL("http://nominatim.openstreetmap.org/search/135%20pilkington%20avenue,%20birmingham?format=xml");
+    			//address = new URL("http://nominatim.openstreetmap.org/search/70%20the%20pond%20road,Toronto?format=xml");
+    			String tmpSearch = jtfAddress.getText().trim();
+    			tmpSearch = tmpSearch.replaceAll(" ", "+");  //replace all blank spaces with a + to create a proper URL
+    			address = new URL("http://nominatim.openstreetmap.org/search?q=" + tmpSearch + "&format=xml");
+    			URLConnection tmpConn = address.openConnection();		    		
+    			BufferedReader in = new BufferedReader(new InputStreamReader(tmpConn.getInputStream()));
+    			
+    			String tmpInput;
+    			double tmpLat = 999.0, tmpLong = 999.0;    //0.0 is a valid location, despite nothing existing there (yet)
+    			while ((tmpInput = in.readLine()) != null && tmpLat != 0.0) {    				
+    				//look for the first line that contains the latitude/longitude
+    				System.out.println(tmpInput);
+    				if (tmpInput.indexOf("lat='") > -1)
+    				{
+    					tmpLat = Double.parseDouble(tmpInput.substring(tmpInput.indexOf("lat='") + 5, tmpInput.indexOf("lon='") - 2));
+    					tmpLong = Double.parseDouble(tmpInput.substring(tmpInput.indexOf("lon='") + 5, tmpInput.indexOf("display_name") - 2));
+    					System.out.println (tmpLat + " " + tmpLong);
+    					System.out.println (tmpInput.substring(tmpInput.indexOf("lat='") + 5, tmpInput.indexOf("lon='") - 2));
+    					System.out.println (tmpInput.substring(tmpInput.indexOf("lon='") + 5, tmpInput.indexOf("display_name") - 2));
+    				}
+    			}
+    			in.close();
+    			
+    			//if no lat/long was found, let's just throw an exception 
+    			if (tmpLat == 999.0)
+    				throw new Exception();
+    			
+    			jXMapKit1.setCenterPosition(new GeoPosition(tmpLat, tmpLong));
+    			statusMessageLabel.setText(jXMapKit1.getCenterPosition().toString());	
+    				
+    			System.out.println(address.toString());
+    			} 
+    			catch (Exception ex)
+    			{
+    				JOptionPane.showMessageDialog( null, "Co-ordinates could not be found for address:\n" + jtfAddress.getText()
+    						, "Invalid address", JOptionPane.INFORMATION_MESSAGE );
+    			}
+    			
+           
+    	}
+    }
+    
+    /* inserted by Michael Afidchao
+     * Event Handler for jumping to locations when selecting an item from the Country/City combo boxes
+     */
+    class LocationCBHandler implements ItemListener {
+    	@SuppressWarnings("unchecked")
+		public void itemStateChanged (ItemEvent e)
+    	{
+    		int tmpIndex = ((JComboBox<String>)e.getSource()).getSelectedIndex();
+    		if (e.getSource() == jcbCountry && e.getStateChange() == ItemEvent.SELECTED && tmpIndex > 0)
+    		{    	    			
+   				jXMapKit1.setCenterPosition(countryList.get(tmpIndex - 1).getPosition());
+   				((JComboBox<String>)e.getSource()).setSelectedIndex(0);
+   				statusMessageLabel.setText(jXMapKit1.getCenterPosition().toString());	
+    		} else if  (e.getSource() == jcbCity && e.getStateChange() == ItemEvent.SELECTED && tmpIndex > 0){
+   				jXMapKit1.setCenterPosition(cityList.get(tmpIndex - 1).getPosition());
+   				((JComboBox<String>)e.getSource()).setSelectedIndex(0);
+   				statusMessageLabel.setText(jXMapKit1.getCenterPosition().toString());	    		
+    		}
+    	}
+    }
+    
+    /* inserted by Michael Afidchao
+     * Event Handler for the Display Address Info button
+     */
+    class DisplayInfoBtnHandler implements ActionListener
+    {
+    	public void actionPerformed (ActionEvent e){
+    		URL address;
+    		String tmpStr = "";
+    		try
+    		{    			
+    			double tmpLat, tmpLong;
+    			tmpLat = jXMapKit1.getCenterPosition().getLatitude();
+    			tmpLong = jXMapKit1.getCenterPosition().getLongitude();
+    			
+    			String tmpSearch = jtfAddress.getText().trim();
+    			tmpSearch = tmpSearch.replaceAll(" ", "+");  //replace all blank spaces with a + to create a proper URL
+    			
+    			//http://nominatim.openstreetmap.org/reverse?format=xml&lat=52.5487429714954&lon=-1.81602098644987&addressdetails=1
+    			address = new URL("http://nominatim.openstreetmap.org/reverse?format=xml&lat=" + tmpLat + "&lon=" + tmpLong + "&addressdetails=1");
+    			
+    			URLConnection tmpConn = address.openConnection();		    		
+    			BufferedReader in = new BufferedReader(new InputStreamReader(tmpConn.getInputStream()));
+    			
+    			String tmpInput;
+    			//double tmpLat = 999.0, tmpLong = 999.0;    //0.0 is a valid location, despite nothing existing there (yet)
+    			//while ((tmpInput = in.readLine()) != null && tmpLat != 0.0) {    				
+    			while ((tmpInput = in.readLine()) != null) {
+    				System.out.println (tmpInput);
+    				//check if we have entered the <addressparts> block
+    				if (tmpInput.contains("<addressparts>"))
+    				{
+    					//extract only certain elements of the block: number, street, city, state and country
+   						//tmpStr += tmpInput;
+    					if (tmpInput.contains("<house_number>"))
+    						tmpStr += tmpInput.substring(tmpInput.indexOf("<house_number>") + 14, tmpInput.indexOf("</house_number>")) + "\n";
+    					if (tmpInput.contains("<road>"))
+    						tmpStr += tmpInput.substring(tmpInput.indexOf("<road>") + 6, tmpInput.indexOf("</road>")) + "\n";
+    					if (tmpInput.contains("<city>"))
+    						tmpStr += tmpInput.substring(tmpInput.indexOf("<city>") + 6, tmpInput.indexOf("</city>")) + "\n";
+    					if (tmpInput.contains("<state>"))
+    						tmpStr += tmpInput.substring(tmpInput.indexOf("<state>") + 7, tmpInput.indexOf("</state>")) + "\n";
+    					if (tmpInput.contains("<country>"))
+    						tmpStr += tmpInput.substring(tmpInput.indexOf("<country>") + 9, tmpInput.indexOf("</country>")) + "\n";
+   						
+    				}
+    				    				
+    			}
+    			in.close();
+    			
+    			System.out.println (tmpStr);
+    
+    			//if no <addressparts> was found, let's just throw an exception 
+    			if (tmpStr.equals(""))
+    				throw new Exception();
+    			
+    			jXMapKit1.setCenterPosition(new GeoPosition(tmpLat, tmpLong));
+    			statusMessageLabel.setText(jXMapKit1.getCenterPosition().toString());	
+    				
+    			System.out.println(address.toString());
+    			} 
+    			catch (Exception ex)
+    			{
+    				System.out.println (ex.getMessage());
+    				// jtfAddress.setText("Invalid address");
+    				tmpStr = "No address data available";
+    			}    			
+    		JOptionPane.showMessageDialog( null, tmpStr, "Reverse Geocode", JOptionPane.INFORMATION_MESSAGE );
+    	}
+    }
+    
+    /* inserted by Michael Afidchao
      * Event Handler for the Latitude/Longitude search button
      */
     class LatLongBtnHandler implements ActionListener
@@ -682,6 +870,8 @@ public class MapView extends FrameView {
     	{
     		waypointList.add(new Waypoint(jXMapKit1.getCenterPosition()));
     		waypointModel.setMaximum(Integer.parseInt(waypointModel.getMaximum().toString()) + 1);
+    		
+            drawWaypoints();           
     	}
     }
     
@@ -701,6 +891,8 @@ public class MapView extends FrameView {
     			//and decrease the maximum value
     			waypointModel.setValue(tmpWp - 1);
     			waypointModel.setMaximum(Integer.parseInt(waypointModel.getMaximum().toString()) - 1);
+    			
+    			drawWaypoints();
     		}
     	}
     }
@@ -744,7 +936,8 @@ public class MapView extends FrameView {
     					}
     				}
     				catch (IOException ex)  //catch exceptions thrown by bad file output writing
-    				{    					
+    				{
+    					  JOptionPane.showMessageDialog( null, ex.getMessage(), "Error with file output", JOptionPane.INFORMATION_MESSAGE );
     				}
     				finally{
     					fileOut.close();
@@ -752,7 +945,7 @@ public class MapView extends FrameView {
     			} 
     			catch (IOException ex) //catch exception thrown by invalid opening of file for output
     			{    			
-    				
+    				JOptionPane.showMessageDialog( null, ex.getMessage(), "Error opening file", JOptionPane.INFORMATION_MESSAGE );
     			}    			
     		}
     	}
@@ -770,7 +963,7 @@ public class MapView extends FrameView {
     		int tmpReturn = fc.showSaveDialog(null);
     		
     		int tmpSize;
-    		List<Waypoint> tmpWpList = new ArrayList<Waypoint>();
+    		ArrayList<Waypoint> tmpWpList = new ArrayList<Waypoint>();
     		
     		if (tmpReturn == JFileChooser.APPROVE_OPTION)    		
     		{
@@ -791,8 +984,7 @@ public class MapView extends FrameView {
     						double tmpLong = Double.parseDouble(tmpScan.nextLine());
 
     						Waypoint wp = new Waypoint(tmpLat, tmpLong);
-    						tmpWpList.add(wp);
-    						jlbByName.setText(wp.getPosition().toString());
+    						tmpWpList.add(wp);    						
     					}
     					
     					//set the waypoint list to the loaded list and reset the spinner
@@ -800,17 +992,19 @@ public class MapView extends FrameView {
     					waypointList = tmpWpList;
     					waypointModel.setValue(0);
     					waypointModel.setMaximum(tmpSize);
+    					
+    					drawWaypoints();
     				} 
     				catch (Exception ex)  //catch all possible exceptions after successful file open
     				{    				
-    					
+    					JOptionPane.showMessageDialog( null, ex.getMessage(), "Error with file reading", JOptionPane.INFORMATION_MESSAGE );
     				}
     				finally{
     					tmpScan.close();
     				}    				    			
     			} catch (IOException ex) //catch exception thrown by invalid file opening for input
     			{    			
-    				
+    				JOptionPane.showMessageDialog( null, ex.getMessage(), "Error opening file", JOptionPane.INFORMATION_MESSAGE );
     			}
     		}    		
     	}
